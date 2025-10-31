@@ -1,8 +1,8 @@
 import { Routes, Route } from "react-router-dom";
-import RegistroPages from "./pages/RegistroPages";
-import LoginPages from "./pages/LoginPages";
-import HomePages from "./pages/HomePages";
-import PageInit from "./pages/PageInit";
+import RegistroPages from "../modules/auth/pages/RegistroPages";
+import LoginPages from "../modules/auth/pages/LoginPages";
+import HomePages from "../home/pages/HomePages";
+import PageInit from "../app/PageInit";
 
 export default function App() {
   return (
