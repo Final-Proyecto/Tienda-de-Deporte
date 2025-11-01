@@ -1,0 +1,33 @@
+{
+  "compilerOptions": {
+    // File Layout
+    "rootDir": "./src",
+    "outDir": "./dist",
+
+    // Environment Settings (Node.js + ES Modules)
+    "module": "NodeNext",
+    "target": "ESNext",
+    "moduleResolution": "NodeNext",
+    "lib": ["ESNext"],
+
+    // Soporte para Node.js
+    "types": ["node"],
+
+    // Salida y depuración
+    "sourceMap": true,
+    "declaration": true,
+
+    // Typechecking estricto
+    "strict": true,
+    "noUncheckedIndexedAccess": true,
+    "exactOptionalPropertyTypes": true,
+    "skipLibCheck": true,
+
+    // Compatibilidad con herramientas modernas
+    "esModuleInterop": true,
+    "verbatimModuleSyntax": true,
+    "isolatedModules": true
+  },
+  "include": ["src/**/*"],
+  "exclude": ["node_modules"]
+}
