@@ -1,19 +1,18 @@
 import express from "express";
 import cors from "cors";
 import morgan from "morgan";
+import { userRoutes } from "./modules/user/user.routes.js";
+import { shopRoutes } from "./modules/shop/shop.routes.js";
 
-const app = express();
+const app: express.Application = express();
 
-const PORT = process.env.PORT || 3000;
-
+// ── Middlewares ──
 app.use(cors());
-app.use(morgan("dev"));
+app.use(morgan("combined"));
 app.use(express.json());
 
-app.get("/", (req, res) => {
-  res.send("Pagina de Inicio de la API");
-});
+// ── Routes ──
+app.use("/api/users", userRoutes);
+app.use("/api/shop", shopRoutes);
 
-app.listen(PORT, () => {
-  console.log(`Servidor corriendo en http://localhost:${PORT}`);
-});
+export default app;
