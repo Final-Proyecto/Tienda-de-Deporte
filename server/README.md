@@ -60,6 +60,7 @@ permitiendo desarrollar nuevas funcionalidades sin romper el resto del sistema.
 │   ├── 📄 app.ts
 │   └── 📄 server.ts
 │
+├── ⚙️ .env.example
 ├── ⚙️ .gitignore
 ├── 📝 README.md
 ├── ⚙️ package.json
