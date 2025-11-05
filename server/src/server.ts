@@ -1,4 +1,3 @@
-// src/server.ts
 import app from "./app.js";
 import config from "./core/config/index.js";
 import DatabaseConnection from "./core/database/database.js";

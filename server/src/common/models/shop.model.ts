@@ -1,4 +1,3 @@
-// src/common/models/User.model.ts
 import { Schema, model, Document } from "mongoose";
 
 export interface IProduct extends Document {

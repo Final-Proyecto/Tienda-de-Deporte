@@ -1,4 +1,3 @@
-// src/common/models/User.model.ts
 import { Schema, model, Document } from "mongoose";
 import { ProductModel } from "./shop.model.js";
 

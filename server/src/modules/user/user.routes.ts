@@ -1,4 +1,3 @@
-// src/modules/user/user.routes.ts
 import { Router, type Router as RouterType } from "express";
 import { UserController } from "./user.controller.js";
 import { authMiddleware } from "../../common/middlewares/auth.middleware.js";
@@ -17,8 +16,12 @@ export class UserRoutes {
     );
     this.router.post("/login", (req, res) => userController.login(req, res));
 
-    this.router.get("/my-products/:id", authMiddleware, (req, res) =>
+    this.router.get("/my-products", authMiddleware, (req, res) =>
       userController.findMyProducts(req, res)
+    );
+
+    this.router.get("/profile", authMiddleware, (req, res) =>
+      userController.getProfile(req, res)
     );
   }
 }

@@ -23,7 +23,7 @@ export class UserController {
       return res.status(201).json(result);
     } catch (error: any) {
       //errores
-      return res.status(400).json({ error: error.message });
+      return res.status(500).json({ error: error.message });
     }
   }
 
@@ -39,20 +39,31 @@ export class UserController {
       return res.status(200).json(response);
     } catch (error: any) {
       //errores
-      return res.status(400).json({ error: error.message });
+      return res.status(500).json({ error: error.message });
     }
   }
 
   async findMyProducts(req: Request, res: Response) {
     try {
-      const id = req.params.id;
+      const id = req.user!.userId;
       if (!id) {
         return res.status(400).json("Id no proporcionado");
       }
       const result = await this.userService.findMyProducts(id);
       return res.status(200).json(result);
     } catch (error: any) {
-      return res.status(400).json({ error: error.message });
+      return res.status(500).json({ error: error.message });
+    }
+  }
+
+  async getProfile(req: Request, res: Response) {
+    try {
+      const userId = req.user!.userId;
+
+      const user = await this.userService.getProfile(userId);
+      res.json(user);
+    } catch (error: any) {
+      res.status(500).json({ error: error.message });
     }
   }
 }

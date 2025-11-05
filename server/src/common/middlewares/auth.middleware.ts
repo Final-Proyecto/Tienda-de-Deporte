@@ -1,4 +1,3 @@
-// src/common/middlewares/auth.middleware.ts
 import type { Request, Response, NextFunction } from "express";
 import config from "../../core/config/index.js";
 import jwt from "jsonwebtoken";
@@ -29,8 +28,8 @@ export const authMiddleware = (
   }
 
   try {
-    const decoded = jwt.verify(token, config.jwtSecret) as { userId: string };
-    req.user = { userId: decoded.userId };
+    const decoded = jwt.verify(token, config.jwtSecret) as { sub: string };
+    req.user = { userId: decoded.sub };
     next();
   } catch (error) {
     return res.status(401).json({ error: "Token inválido o expirado" });

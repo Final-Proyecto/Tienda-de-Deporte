@@ -1,4 +1,3 @@
-// src/core/database/database.ts
 import mongoose from "mongoose";
 
 class DatabaseConnection {

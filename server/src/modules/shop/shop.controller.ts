@@ -22,7 +22,7 @@ export class ShopController {
       const result = await this.shopService.BuyProductService(id, dto);
       return res.status(200).json(result);
     } catch (error: any) {
-      return res.status(400).json({ error: error.message });
+      return res.status(500).json({ error: error.message });
     }
   }
 }

@@ -1,4 +1,3 @@
-// src/modules/user/user.service.ts
 import bcrypt from "bcrypt";
 import jwt from "jsonwebtoken";
 import config from "../../core/config/index.js";
@@ -43,10 +42,17 @@ export class UserService {
     };
   }
 
+  //OBTENER PERFIL DE USUARIO
+  async getProfile(userId: string) {
+    const user = await this.userRespository.findById(userId);
+    if (!user) {
+      throw new Error("Usuario no encontrado");
+    }
+    return user.toJSON();
+  }
   //OBTENER PRODUCTOS DEL USUARIO
   async findMyProducts(id: string) {
     const products = await this.userRespository.findMyProducts(id);
-    if (!products) throw new Error("No se encontraron productos del usuario");
     return products;
   }
 }

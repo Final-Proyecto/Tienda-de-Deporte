@@ -13,10 +13,8 @@ export class UserRepository {
   }
 
   async findById(id: string) {
-    return await this.user.findById(id).exec();
-  }
-
-  async findMyProducts(id: string) {
     return await this.user.findById(id).populate("products.productId").exec();
   }
+
+  async findMyProducts(id: string) {}
 }
