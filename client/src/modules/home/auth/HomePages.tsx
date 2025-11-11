@@ -3,6 +3,8 @@ import { Globe } from "@/common/components/ui/globe";
 import { useState, useEffect } from "react";
 import { logout, getProfile } from "@/modules/user/api/UserAPI";
 import { buyProduct } from "@/modules/shop/api/ShopAPI";
+import { toast } from "sonner";
+
 import cintaDedo from "@/common/public/cinta-dedo.png";
 import inflador from "@/common/public/inflador.png";
 import mangas from "@/common/public/mangas.png";
@@ -13,19 +15,17 @@ import rodillera from "@/common/public/rodillera.png";
 import zapatillas from "@/common/public/zapatilla.png";
 
 interface ProductData {
-  _id: string;
+  _id?: string;
   name: string;
   description: string;
   price: number;
   image: string;
-  createdAt: string;
+  createdAt?: string;
 }
-
 interface UserProduct {
   productId: ProductData;
   _id: string;
 }
-
 interface User {
   _id: string;
   name: string;
@@ -34,14 +34,23 @@ interface User {
   createdAt: string;
 }
 
+type CartItem = ProductData & { qty: number };
+type Step = "cart" | "payment" | "confirm" | null;
+type Payment = "tarjeta" | "transferencia" | "mercadopago" | null;
+
 export default function HomePages() {
   const [currentPage, setCurrentPage] = useState("inicio");
   const [user, setUser] = useState<User | null>(null);
   const [loading, setLoading] = useState(true);
   const [buyingProduct, setBuyingProduct] = useState<string | null>(null);
 
+  // Carrito
+  const [cart, setCart] = useState<CartItem[]>([]);
+  const [checkoutStep, setCheckoutStep] = useState<Step>(null);
+  const [paymentMethod, setPaymentMethod] = useState<Payment>(null);
+
   // Productos disponibles en la tienda
-  const storeProducts = [
+  const storeProducts: ProductData[] = [
     {
       name: "Cinta Dedos",
       price: 15000,
@@ -92,17 +101,24 @@ export default function HomePages() {
     },
   ];
 
-  // Cargar datos del usuario al montar
+  // Cargar datos al montar
   useEffect(() => {
     loadUserData();
+    const raw = localStorage.getItem("cart");
+    if (raw) setCart(JSON.parse(raw));
   }, []);
+
+  useEffect(() => {
+    localStorage.setItem("cart", JSON.stringify(cart));
+  }, [cart]);
 
   const loadUserData = async () => {
     try {
       const userData = await getProfile();
       setUser(userData);
     } catch (error) {
-      console.error("Error al cargar usuario:", error);
+      toast.error("No se pudo cargar el usuario");
+      console.error(error);
     } finally {
       setLoading(false);
     }
@@ -110,11 +126,14 @@ export default function HomePages() {
 
   const handleLogout = () => {
     logout();
+    toast("Sesión cerrada", { description: "Volvé cuando quieras." });
   };
 
-  const handleBuyProduct = async (product: (typeof storeProducts)[0]) => {
-    if (!user) return;
-
+  const handleBuyProduct = async (product: ProductData) => {
+    if (!user) {
+      toast.error("Iniciá sesión para comprar");
+      return;
+    }
     setBuyingProduct(product.name);
     try {
       await buyProduct(user._id, {
@@ -123,24 +142,255 @@ export default function HomePages() {
         price: product.price,
         image: product.image,
       });
-
-      alert(`¡${product.name} comprado exitosamente! 🎉`);
-
-      // Recargar el perfil para actualizar la lista de productos
+      toast.success("Compra realizada", {
+        description: `${product.name} fue agregado a tus productos`,
+      });
       await loadUserData();
     } catch (error: any) {
-      alert(`Error al comprar: ${error.message}`);
+      toast.error("Error al comprar", {
+        description: error?.message || "Intentalo de nuevo",
+      });
     } finally {
       setBuyingProduct(null);
     }
   };
 
-  const formatPrice = (price: number) => {
-    return new Intl.NumberFormat("es-AR", {
+  // Carrito helpers
+  const addToCart = (p: ProductData) => {
+    setCart((prev) => {
+      const idx = prev.findIndex((i) => i.name === p.name);
+      if (idx >= 0) {
+        const copy = [...prev];
+        copy[idx] = { ...copy[idx], qty: copy[idx].qty + 1 };
+        toast("Cantidad actualizada", {
+          description: `${p.name} x${copy[idx].qty}`,
+        });
+        return copy;
+      }
+      toast.success("Agregado al carrito", { description: p.name });
+      return [...prev, { ...p, qty: 1 }];
+    });
+  };
+  const removeFromCart = (name: string) => {
+    setCart((prev) => prev.filter((i) => i.name !== name));
+    toast("Producto eliminado", { description: name });
+  };
+  const changeQty = (name: string, delta: number) => {
+    setCart((prev) =>
+      prev.map((i) =>
+        i.name === name ? { ...i, qty: Math.max(1, i.qty + delta) } : i
+      )
+    );
+  };
+  const cartCount = cart.reduce((acc, i) => acc + i.qty, 0);
+  const cartTotal = cart.reduce((acc, i) => acc + i.price * i.qty, 0);
+
+  const handleConfirmPurchase = async () => {
+    if (!user || cart.length === 0 || !paymentMethod) {
+      toast.error("Faltan datos para confirmar");
+      return;
+    }
+    setBuyingProduct("bulk");
+    try {
+      for (const item of cart) {
+        for (let k = 0; k < item.qty; k++) {
+          await buyProduct(user._id, {
+            name: item.name,
+            description: item.description,
+            price: item.price,
+            image: item.image,
+          });
+        }
+      }
+      toast.success("Compra confirmada", {
+        description: `Método: ${paymentMethod} • Total: ${formatPrice(
+          cartTotal
+        )}`,
+      });
+      setCart([]);
+      setCheckoutStep(null);
+      await loadUserData();
+    } catch (e: any) {
+      toast.error("Error en el checkout", {
+        description: e?.message || "Intentá nuevamente",
+      });
+    } finally {
+      setBuyingProduct(null);
+    }
+  };
+
+  const formatPrice = (price: number) =>
+    new Intl.NumberFormat("es-AR", {
       style: "currency",
       currency: "ARS",
       minimumFractionDigits: 0,
     }).format(price);
+
+  // Modal genérico
+  function Modal({
+    children,
+    onClose,
+  }: {
+    children: React.ReactNode;
+    onClose: () => void;
+  }) {
+    return (
+      <div className="fixed inset-0 z-[60] flex items-center justify-center">
+        <div className="absolute inset-0 bg-black/60" onClick={onClose} />
+        <div className="relative bg-gray-900/90 border border-white/10 rounded-2xl p-6 w-full max-w-2xl shadow-2xl">
+          {children}
+        </div>
+      </div>
+    );
+  }
+
+  const CheckoutModal = () => {
+    if (!checkoutStep) return null;
+    return (
+      <Modal onClose={() => setCheckoutStep(null)}>
+        {checkoutStep === "cart" && (
+          <div className="space-y-4">
+            <h3 className="text-white text-xl font-bold">
+              Carrito ({cartCount} ítems)
+            </h3>
+            {cart.length === 0 ? (
+              <p className="text-white/70">Tu carrito está vacío.</p>
+            ) : (
+              <div className="space-y-3">
+                {cart.map((i) => (
+                  <div
+                    key={i.name}
+                    className="flex items-center justify-between bg-white/5 border border-white/10 rounded-xl p-3"
+                  >
+                    <div className="flex items-center gap-3">
+                      <img
+                        src={i.image}
+                        alt={i.name}
+                        className="w-12 h-12 rounded-md object-cover"
+                      />
+                      <div>
+                        <p className="text-white font-medium">{i.name}</p>
+                        <p className="text-white/60 text-sm">
+                          {formatPrice(i.price)}
+                        </p>
+                      </div>
+                    </div>
+                    <div className="flex items-center gap-2">
+                      <button
+                        onClick={() => changeQty(i.name, -1)}
+                        className="px-2 py-1 bg-white/10 rounded"
+                      >
+                        -
+                      </button>
+                      <span className="text-white">{i.qty}</span>
+                      <button
+                        onClick={() => changeQty(i.name, +1)}
+                        className="px-2 py-1 bg-white/10 rounded"
+                      >
+                        +
+                      </button>
+                      <button
+                        onClick={() => removeFromCart(i.name)}
+                        className="ml-2 px-3 py-1 bg-red-500/30 rounded text-white"
+                      >
+                        Quitar
+                      </button>
+                    </div>
+                  </div>
+                ))}
+              </div>
+            )}
+            <div className="flex items-center justify-between pt-2">
+              <p className="text-white text-lg font-bold">
+                Total: {formatPrice(cartTotal)}
+              </p>
+              <div className="flex gap-3">
+                <button
+                  onClick={() => setCheckoutStep(null)}
+                  className="px-4 py-2 bg-white/10 rounded-lg text-white"
+                >
+                  Seguir comprando
+                </button>
+                <button
+                  disabled={cart.length === 0}
+                  onClick={() => setCheckoutStep("payment")}
+                  className="px-4 py-2 bg-gradient-to-r from-red-500/80 to-orange-500/80 rounded-lg text-white disabled:opacity-50"
+                >
+                  Elegir pago
+                </button>
+              </div>
+            </div>
+          </div>
+        )}
+
+        {checkoutStep === "payment" && (
+          <div className="space-y-4">
+            <h3 className="text-white text-xl font-bold">Método de pago</h3>
+            <div className="grid grid-cols-1 sm:grid-cols-3 gap-3">
+              {[
+                { key: "tarjeta", label: "💳 Tarjeta" },
+                { key: "transferencia", label: "🏦 Transferencia" },
+                { key: "mercadopago", label: "💙 Mercado Pago" },
+              ].map((opt) => (
+                <button
+                  key={opt.key}
+                  onClick={() => setPaymentMethod(opt.key as Payment)}
+                  className={`p-3 rounded-xl border ${
+                    paymentMethod === opt.key
+                      ? "bg-white/20 border-white/40"
+                      : "bg-white/10 border-white/20"
+                  } text-white`}
+                >
+                  {opt.label}
+                </button>
+              ))}
+            </div>
+            <div className="flex justify-between">
+              <button
+                onClick={() => setCheckoutStep("cart")}
+                className="px-4 py-2 bg-white/10 rounded-lg text-white"
+              >
+                Volver
+              </button>
+              <button
+                disabled={!paymentMethod}
+                onClick={() => setCheckoutStep("confirm")}
+                className="px-4 py-2 bg-gradient-to-r from-red-500/80 to-orange-500/80 rounded-lg text-white disabled:opacity-50"
+              >
+                Continuar
+              </button>
+            </div>
+          </div>
+        )}
+
+        {checkoutStep === "confirm" && (
+          <div className="space-y-4">
+            <h3 className="text-white text-xl font-bold">Confirmación</h3>
+            <p className="text-white/80">
+              Total a pagar:{" "}
+              <span className="font-semibold">{formatPrice(cartTotal)}</span>
+            </p>
+            <p className="text-white/80">
+              Método: <span className="font-semibold">{paymentMethod}</span>
+            </p>
+            <div className="flex justify-between">
+              <button
+                onClick={() => setCheckoutStep("payment")}
+                className="px-4 py-2 bg-white/10 rounded-lg text-white"
+              >
+                Volver
+              </button>
+              <button
+                onClick={handleConfirmPurchase}
+                className="px-4 py-2 bg-green-500/80 hover:bg-green-600 rounded-lg text-white"
+              >
+                Confirmar compra
+              </button>
+            </div>
+          </div>
+        )}
+      </Modal>
+    );
   };
 
   // Contenido de cada página
@@ -174,18 +424,31 @@ export default function HomePages() {
                   <p className="text-orange-400 font-bold text-2xl mb-4">
                     {formatPrice(product.price)}
                   </p>
+                  <div className="flex gap-3">
+                    <button
+                      onClick={() => addToCart(product)}
+                      className="flex-1 bg-white/15 border border-white/25 text-white py-3 rounded-xl font-semibold hover:bg白/25 transition-all"
+                    >
+                      ➕ Agregar
+                    </button>
+                    <button
+                      onClick={() => {
+                        addToCart(product);
+                        setCheckoutStep("cart");
+                      }}
+                      className="flex-1 bg-gradient-to-r from-red-500/80 to-orange-500/80 border border-red-400/30 text-white py-3 rounded-xl font-semibold hover:from-red-600 hover:to-orange-600 transition-all"
+                    >
+                      🛒 Ir al carrito
+                    </button>
+                  </div>
                   <button
                     onClick={() => handleBuyProduct(product)}
                     disabled={buyingProduct === product.name}
-                    className="w-full bg-gradient-to-r from-red-500/80 to-orange-500/80 backdrop-blur-lg border border-red-400/30 text-white py-3 rounded-xl font-semibold hover:from-red-600 hover:to-orange-600 hover:scale-105 transition-all duration-300 shadow-lg disabled:opacity-50 disabled:cursor-not-allowed disabled:hover:scale-100"
+                    className="mt-3 w-full bg-white/10 border border-white/20 text-white py-2 rounded-lg hover:bg-white/20 transition-all disabled:opacity-50"
                   >
-                    {buyingProduct === product.name ? (
-                      <span className="flex items-center justify-center gap-2">
-                        <span className="animate-spin">⏳</span> Comprando...
-                      </span>
-                    ) : (
-                      "Comprar Ahora"
-                    )}
+                    {buyingProduct === product.name
+                      ? "⏳ Comprando..."
+                      : "Comprar uno ahora"}
                   </button>
                 </div>
               ))}
@@ -240,9 +503,9 @@ export default function HomePages() {
                         </p>
                         <p className="text-white/40 text-xs">
                           Fecha:{" "}
-                          {new Date(product.createdAt).toLocaleDateString(
-                            "es-AR"
-                          )}
+                          {new Date(
+                            product.createdAt || Date.now()
+                          ).toLocaleDateString("es-AR")}
                         </p>
                       </div>
                     </div>
@@ -301,6 +564,12 @@ export default function HomePages() {
               >
                 🎒 Mis Productos ({user?.products?.length || 0})
               </button>
+              <button
+                onClick={() => setCheckoutStep("cart")}
+                className="px-8 py-3 bg-white/20 backdrop-blur-lg border border-white/30 rounded-full text-white font-semibold hover:bg-white/30 hover:scale-105 transition-all duration-300"
+              >
+                🧾 Ver Carrito ({cartCount})
+              </button>
             </div>
           </div>
         );
@@ -328,7 +597,7 @@ export default function HomePages() {
       <nav className="fixed top-6 left-1/2 transform -translate-x-1/2 z-50 w-[95%] max-w-6xl mx-auto">
         <div className="bg-white/10 backdrop-blur-2xl border border-white/20 rounded-2xl shadow-2xl shadow-black/30 py-3 px-6">
           <div className="flex items-center justify-between">
-            {/* Logo y Nombre SPORTGLOW */}
+            {/* Logo */}
             <div
               className="flex items-center gap-3 group cursor-pointer"
               onClick={() => setCurrentPage("inicio")}
@@ -360,9 +629,18 @@ export default function HomePages() {
                   {item.name}
                 </button>
               ))}
+
+              {/* Carrito en nav */}
+              <button
+                onClick={() => setCheckoutStep("cart")}
+                className="relative text-white/80 hover:text-white border-transparent transition-all font-medium text-sm px-3 py-2 rounded-lg hover:bg-white/10 border"
+              >
+                🛒 Carrito{" "}
+                <span className="ml-1 text-white/70">({cartCount})</span>
+              </button>
             </div>
 
-            {/* Botón de Logout */}
+            {/* Logout */}
             <div className="flex items-center space-x-3">
               <span className="text-white/60 text-sm hidden lg:block">
                 {user?.email}
@@ -400,6 +678,9 @@ export default function HomePages() {
           </div>
         </div>
       </div>
+
+      {/* Checkout modal */}
+      {checkoutStep && <CheckoutModal />}
     </div>
   );
 }
