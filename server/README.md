@@ -3,10 +3,6 @@
 **Versión:** 1.0  
 **Base URL:** `http://localhost:4000/api`
 
-> En producción, reemplaza `http://localhost:4000` por tu dominio real.
-
----
-
 ## ⚙️ Arquitectura del Proyecto
 
 Este backend está desarrollado con **Node.js**, **Express** y **TypeScript**, siguiendo una **arquitectura monolítica modular**.
